@@ -15,9 +15,12 @@ software to install, works in Chrome, Edge, and Opera.
 - **Wake word on-device.** microWakeWord runs on the ESP32-S3, so audio only
   leaves the device once you address it. Run Whisper and Piper in Home
   Assistant and nothing leaves your network at all.
+- **Set up without touching YAML.** Pick your lights and sensors from
+  dropdowns in Home Assistant. Entity IDs are not compiled into the firmware,
+  so you can change them later without reflashing.
 - **Round dashboard.** Clock, two light toggles, a climate arc, and media
   transport controls, laid out for a circular panel rather than cropped from a
-  rectangular one.
+  rectangular one. Swipe or tap the chevron to move between pages.
 - **Real audio.** ES8311 codec drives the onboard mic and the speaker header,
   so you get spoken replies, timers, and Home Assistant announcements.
 - **Doubles as a media player.** It appears in Home Assistant as a media
@@ -39,30 +42,42 @@ to force the bootloader.
 ## Adopting it in Home Assistant
 
 Home Assistant discovers the device automatically once it joins Wi-Fi. Go to
-*Settings → Devices & Services*, adopt the ESPHome device, then assign it an
+*Settings → Devices & Services* and adopt the ESPHome device, then assign it an
 Assist pipeline under *Settings → Voice assistants*.
 
-To let the dashboard's light buttons work, enable **Allow the device to perform
-Home Assistant actions** on the device page.
+## Choosing what appears on screen
 
-## Making it yours
+The firmware has no entity IDs compiled into it. Instead it exposes empty
+slots that Home Assistant writes into, and a blueprint wires those slots to
+whatever you pick:
 
-The dashboard is wired to entity IDs at the top of
-[`esphome/ha-amoled-satellite.yaml`](esphome/ha-amoled-satellite.yaml):
+1. Import [`blueprints/halo_dashboard.yaml`](blueprints/halo_dashboard.yaml)
+   under *Settings → Automations & Scenes → Blueprints → Import blueprint*.
+2. Create an automation from it.
+3. Pick your satellite, its two `Tile` switches, and the lights, sensors, and
+   weather entity you want shown.
 
-```yaml
-substitutions:
-  light_1_entity: light.living_room
-  light_1_name: Living room
-  light_2_entity: light.kitchen
-  light_2_name: Kitchen
-  temperature_entity: sensor.outside_temperature
-  humidity_entity: sensor.living_room_humidity
-  weather_entity: weather.forecast_home
-```
+That's it — the screen fills in within a few seconds. Change your mind later
+and just edit the automation; no rebuild, no reflash.
 
-Change those, then either adopt the config in the ESPHome add-on and install
-over the air, or build it yourself:
+Until you do this, the climate page shows `--` and the tiles read
+`Tile 1` / `Tile 2`, because nothing has sent it any values yet.
+
+### How it works
+
+| Direction | Mechanism |
+| --- | --- |
+| HA → screen | Blueprint calls `number.set_value` / `text.set_value` on the device's slots |
+| Screen → HA | Tapping a tile flips the device's `Tile` switch; the blueprint sees it and toggles the real light |
+
+The blueprint finds the write-only slots itself via `device_entities()`, so it
+keeps working regardless of the MAC suffix in the device name. Only the two
+`Tile` switches are picked by hand, because Home Assistant does not allow
+templated entity IDs in automation triggers.
+
+## Building it yourself
+
+Only needed if you want to change the layout or add pages:
 
 ```bash
 esphome run esphome/ha-amoled-satellite.yaml
@@ -74,8 +89,10 @@ esphome run esphome/ha-amoled-satellite.yaml
 | --- | --- |
 | `esphome/ha-amoled-satellite.yaml` | Entry point: naming, Wi-Fi, API, OTA, Improv |
 | `esphome/boards/waveshare-esp32-s3-touch-amoled-1.32.yaml` | Hardware: pins, display, touch, audio, power, battery |
+| `esphome/packages/ha_bridge.yaml` | The writable slots Home Assistant pushes values into |
 | `esphome/packages/voice.yaml` | Wake word, Assist pipeline, speaker mixing, media player |
 | `esphome/packages/ui.yaml` | LVGL pages and the voice overlay |
+| `blueprints/halo_dashboard.yaml` | Home Assistant blueprint that wires the slots to your entities |
 | `docs/` | The web flasher, published to GitHub Pages |
 | `.github/workflows/build.yml` | Builds firmware and deploys the flasher |
 

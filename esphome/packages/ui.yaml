@@ -33,55 +33,9 @@ script:
             }
             return now.strftime("%A %d %B");
 
-sensor:
-  - platform: homeassistant
-    id: outside_temperature
-    entity_id: ${temperature_entity}
-    on_value:
-      - lvgl.label.update:
-          id: sensor_temp_value
-          text: !lambda return str_sprintf("%.1f°", x);
-
-  - platform: homeassistant
-    id: inside_humidity
-    entity_id: ${humidity_entity}
-    on_value:
-      - lvgl.label.update:
-          id: sensor_humidity_value
-          text: !lambda return str_sprintf("%.0f%%", x);
-      - lvgl.arc.update:
-          id: humidity_arc
-          value: !lambda return x;
-
-text_sensor:
-  - platform: homeassistant
-    id: weather_state
-    entity_id: ${weather_entity}
-    on_value:
-      - lvgl.label.update:
-          id: clock_weather
-          text: !lambda return x;
-
-binary_sensor:
-  - platform: homeassistant
-    id: light_1_state
-    entity_id: ${light_1_entity}
-    trigger_on_initial_state: true
-    on_state:
-      - lvgl.widget.update:
-          id: light_1_button
-          state:
-            checked: !lambda return x;
-
-  - platform: homeassistant
-    id: light_2_state
-    entity_id: ${light_2_entity}
-    trigger_on_initial_state: true
-    on_state:
-      - lvgl.widget.update:
-          id: light_2_button
-          state:
-            checked: !lambda return x;
+# Climate, weather and tile state all arrive from Home Assistant through the
+# slots defined in packages/ha_bridge.yaml, so nothing here is bound to a
+# hardcoded entity ID.
 
 lvgl:
   displays:
@@ -159,6 +113,14 @@ lvgl:
   pages:
     # ---------------- Clock ----------------
     - id: page_clock
+      on_swipe_left:
+        - lvgl.page.next:
+            animation: MOVE_LEFT
+            time: 250ms
+      on_swipe_right:
+        - lvgl.page.previous:
+            animation: MOVE_RIGHT
+            time: 250ms
       widgets:
         - label:
             id: clock_time
@@ -196,6 +158,14 @@ lvgl:
 
     # ---------------- Lights ----------------
     - id: page_lights
+      on_swipe_left:
+        - lvgl.page.next:
+            animation: MOVE_LEFT
+            time: 250ms
+      on_swipe_right:
+        - lvgl.page.previous:
+            animation: MOVE_RIGHT
+            time: 250ms
       widgets:
         - label:
             align: top_mid
@@ -209,40 +179,34 @@ lvgl:
             y: -48
             width: 268
             height: 84
-            checkable: true
             styles: tile_button
             checked:
               bg_color: 0x38E0C4
               text_color: 0x04120F
             widgets:
               - label:
+                  id: light_1_label
                   align: center
-                  text: ${light_1_name}
+                  text: "Tile 1"
             on_click:
-              - homeassistant.action:
-                  action: light.toggle
-                  data:
-                    entity_id: ${light_1_entity}
+              - switch.toggle: ui_tile_1
         - button:
             id: light_2_button
             align: center
             y: 48
             width: 268
             height: 84
-            checkable: true
             styles: tile_button
             checked:
               bg_color: 0x38E0C4
               text_color: 0x04120F
             widgets:
               - label:
+                  id: light_2_label
                   align: center
-                  text: ${light_2_name}
+                  text: "Tile 2"
             on_click:
-              - homeassistant.action:
-                  action: light.toggle
-                  data:
-                    entity_id: ${light_2_entity}
+              - switch.toggle: ui_tile_2
         - button:
             align: bottom_mid
             y: -46
@@ -259,6 +223,14 @@ lvgl:
 
     # ---------------- Sensors ----------------
     - id: page_sensors
+      on_swipe_left:
+        - lvgl.page.next:
+            animation: MOVE_LEFT
+            time: 250ms
+      on_swipe_right:
+        - lvgl.page.previous:
+            animation: MOVE_RIGHT
+            time: 250ms
       widgets:
         - label:
             align: top_mid
@@ -308,6 +280,14 @@ lvgl:
 
     # ---------------- Media ----------------
     - id: page_media
+      on_swipe_left:
+        - lvgl.page.next:
+            animation: MOVE_LEFT
+            time: 250ms
+      on_swipe_right:
+        - lvgl.page.previous:
+            animation: MOVE_RIGHT
+            time: 250ms
       widgets:
         - label:
             align: top_mid

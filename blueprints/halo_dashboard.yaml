@@ -1,0 +1,258 @@
+blueprint:
+  name: Halo dashboard
+  description: >-
+    Connects a Halo satellite to your Home Assistant entities.
+
+
+    Pick your device and the entities you want on screen. Everything is wired
+    both ways: sensor values are pushed to the display, and tapping a tile
+    toggles the real light.
+
+
+    None of this is compiled into the firmware, so you can change any of these
+    choices later without reflashing.
+  domain: automation
+  source_url: https://github.com/motamed/ESP-S3-1.32/blob/main/blueprints/halo_dashboard.yaml
+  input:
+    device:
+      name: Satellite
+      icon: mdi:tablet-dashboard
+      collapsed: false
+      input:
+        halo_device:
+          name: Halo device
+          description: The satellite you want to configure.
+          selector:
+            device:
+              integration: esphome
+              multiple: false
+
+        tile_1_switch:
+          name: Tile 1 switch
+          description: >-
+            The satellite's own "Tile 1" switch. It mirrors the light on screen
+            and reports taps back here.
+          selector:
+            entity:
+              filter:
+                domain: switch
+                integration: esphome
+
+        tile_2_switch:
+          name: Tile 2 switch
+          description: The satellite's own "Tile 2" switch.
+          selector:
+            entity:
+              filter:
+                domain: switch
+                integration: esphome
+
+    content:
+      name: What to show
+      icon: mdi:view-dashboard-outline
+      collapsed: false
+      input:
+        tile_1_light:
+          name: Tile 1 light
+          description: Toggled by the top tile.
+          selector:
+            entity:
+              filter:
+                domain: light
+
+        tile_2_light:
+          name: Tile 2 light
+          description: Toggled by the bottom tile.
+          selector:
+            entity:
+              filter:
+                domain: light
+
+        temperature_sensor:
+          name: Temperature sensor
+          description: Shown large on the climate page.
+          selector:
+            entity:
+              filter:
+                domain: sensor
+                device_class: temperature
+
+        humidity_sensor:
+          name: Humidity sensor
+          description: Shown as a ring on the climate page.
+          selector:
+            entity:
+              filter:
+                domain: sensor
+                device_class: humidity
+
+        weather_entity:
+          name: Weather
+          description: Its condition appears under the clock.
+          selector:
+            entity:
+              filter:
+                domain: weather
+
+# Several entities can change at once, so queue updates rather than drop them.
+mode: queued
+max: 25
+max_exceeded: silent
+
+variables:
+  halo_device: !input halo_device
+  tile_1_switch: !input tile_1_switch
+  tile_2_switch: !input tile_2_switch
+  tile_1_light: !input tile_1_light
+  tile_2_light: !input tile_2_light
+  temperature_sensor: !input temperature_sensor
+  humidity_sensor: !input humidity_sensor
+  weather_entity: !input weather_entity
+  # The remaining slots are only ever written to, never used as triggers, so
+  # they can be discovered from the device rather than making you pick each
+  # one. This keeps working whatever the device ended up being named -- the
+  # firmware appends a MAC suffix so several satellites can coexist.
+  slot_temperature: >-
+    {{ device_entities(halo_device) | select('search', '^number\..*temperature_slot')
+       | list | first | default('', true) }}
+  slot_humidity: >-
+    {{ device_entities(halo_device) | select('search', '^number\..*humidity_slot')
+       | list | first | default('', true) }}
+  slot_weather: >-
+    {{ device_entities(halo_device) | select('search', '^text\..*weather_slot')
+       | list | first | default('', true) }}
+  slot_tile_1_label: >-
+    {{ device_entities(halo_device) | select('search', '^text\..*tile_1_label')
+       | list | first | default('', true) }}
+  slot_tile_2_label: >-
+    {{ device_entities(halo_device) | select('search', '^text\..*tile_2_label')
+       | list | first | default('', true) }}
+
+triggers:
+  # Someone tapped a tile on the device.
+  - trigger: state
+    entity_id: !input tile_1_switch
+    to: ["on", "off"]
+    id: tile_1_tapped
+  - trigger: state
+    entity_id: !input tile_2_switch
+    to: ["on", "off"]
+    id: tile_2_tapped
+
+  # Something changed in Home Assistant that the screen should reflect.
+  - trigger: state
+    entity_id:
+      - !input temperature_sensor
+      - !input humidity_sensor
+      - !input weather_entity
+      - !input tile_1_light
+      - !input tile_2_light
+    id: ha_changed
+
+  # Re-push everything after a restart, so a rebooted satellite never sits
+  # showing stale values.
+  - trigger: homeassistant
+    event: start
+    id: refresh
+  - trigger: time_pattern
+    minutes: "/15"
+    id: refresh
+
+conditions: []
+
+actions:
+  - choose:
+      # ---- device -> Home Assistant ----
+      # Only act when the tile and the light actually disagree. That is what
+      # stops this ping-ponging with the sync branch below.
+      - alias: Tile 1 tapped
+        conditions:
+          - condition: trigger
+            id: tile_1_tapped
+          - condition: template
+            value_template: >-
+              {{ is_state(tile_1_switch, 'on') != is_state(tile_1_light, 'on') }}
+        sequence:
+          - action: "light.turn_{{ 'on' if is_state(tile_1_switch, 'on') else 'off' }}"
+            target:
+              entity_id: "{{ tile_1_light }}"
+
+      - alias: Tile 2 tapped
+        conditions:
+          - condition: trigger
+            id: tile_2_tapped
+          - condition: template
+            value_template: >-
+              {{ is_state(tile_2_switch, 'on') != is_state(tile_2_light, 'on') }}
+        sequence:
+          - action: "light.turn_{{ 'on' if is_state(tile_2_switch, 'on') else 'off' }}"
+            target:
+              entity_id: "{{ tile_2_light }}"
+
+    # ---- Home Assistant -> device ----
+    # Pushing every value on any change keeps this simple and idempotent, and
+    # the calls are local and cheap.
+    default:
+      - alias: Push everything to the screen
+        parallel:
+          - alias: Temperature
+            sequence:
+              - condition: template
+                value_template: >-
+                  {{ slot_temperature != ''
+                     and states(temperature_sensor) not in ['unknown', 'unavailable'] }}
+              - action: number.set_value
+                target:
+                  entity_id: "{{ slot_temperature }}"
+                data:
+                  value: "{{ states(temperature_sensor) | float(0) | round(1) }}"
+
+          - alias: Humidity
+            sequence:
+              - condition: template
+                value_template: >-
+                  {{ slot_humidity != ''
+                     and states(humidity_sensor) not in ['unknown', 'unavailable'] }}
+              - action: number.set_value
+                target:
+                  entity_id: "{{ slot_humidity }}"
+                data:
+                  value: "{{ states(humidity_sensor) | float(0) | round(0) }}"
+
+          - alias: Weather
+            sequence:
+              - condition: template
+                value_template: "{{ slot_weather != '' }}"
+              - action: text.set_value
+                target:
+                  entity_id: "{{ slot_weather }}"
+                data:
+                  value: >-
+                    {{ states(weather_entity) | replace('-', ' ')
+                       | replace('_', ' ') | title }}
+
+          - alias: Tile 1
+            sequence:
+              - action: "switch.turn_{{ 'on' if is_state(tile_1_light, 'on') else 'off' }}"
+                target:
+                  entity_id: "{{ tile_1_switch }}"
+              - condition: template
+                value_template: "{{ slot_tile_1_label != '' }}"
+              - action: text.set_value
+                target:
+                  entity_id: "{{ slot_tile_1_label }}"
+                data:
+                  value: "{{ state_attr(tile_1_light, 'friendly_name') or tile_1_light }}"
+
+          - alias: Tile 2
+            sequence:
+              - action: "switch.turn_{{ 'on' if is_state(tile_2_light, 'on') else 'off' }}"
+                target:
+                  entity_id: "{{ tile_2_switch }}"
+              - condition: template
+                value_template: "{{ slot_tile_2_label != '' }}"
+              - action: text.set_value
+                target:
+                  entity_id: "{{ slot_tile_2_label }}"
+                data:
+                  value: "{{ state_attr(tile_2_light, 'friendly_name') or tile_2_light }}"
