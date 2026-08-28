@@ -84,7 +84,8 @@
             <h3>Adopt in Home Assistant</h3>
             <p>
               Home Assistant discovers it automatically. Click adopt, assign an
-              Assist pipeline, and start talking.
+              Assist pipeline, then import the dashboard blueprint and pick
+              your entities from dropdowns &mdash; no YAML, no reflashing.
             </p>
           </li>
         </ol>
@@ -119,6 +120,14 @@
             <p>
               AMOLED means unlit pixels draw nothing. The idle face is designed
               around that instead of fighting it.
+            </p>
+          </article>
+          <article>
+            <h3>Set up without YAML</h3>
+            <p>
+              Pick your lights and sensors from dropdowns in Home Assistant.
+              Nothing is compiled in, so you can change them anytime without
+              reflashing.
             </p>
           </article>
           <article>
@@ -159,6 +168,13 @@
             Give it about 30 seconds on first boot. If it stays dark, check the
             USB serial log &mdash; a mismatched flash or PSRAM mode shows up
             there as a boot loop.
+          </dd>
+
+          <dt>The climate page just shows &ldquo;--&rdquo;</dt>
+          <dd>
+            The screen is waiting for Home Assistant to send it values. Import
+            the dashboard blueprint and pick your sensors &mdash; the page
+            fills in within a few seconds.
           </dd>
 
           <dt>It flashed, but Home Assistant can&rsquo;t see it</dt>

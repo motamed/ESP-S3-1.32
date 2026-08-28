@@ -8,16 +8,6 @@ substitutions:
   name: halo
   friendly_name: Halo
 
-  # Point these at your own Home Assistant entities. They are the only things
-  # most people need to change.
-  light_1_entity: light.living_room
-  light_1_name: Living room
-  light_2_entity: light.kitchen
-  light_2_name: Kitchen
-  temperature_entity: sensor.outside_temperature
-  humidity_entity: sensor.living_room_humidity
-  weather_entity: weather.forecast_home
-
 esphome:
   name: ${name}
   friendly_name: ${friendly_name}
@@ -30,6 +20,7 @@ esphome:
 
 packages:
   board: !include boards/waveshare-esp32-s3-touch-amoled-1.32.yaml
+  ha_bridge: !include packages/ha_bridge.yaml
   ui: !include packages/ui.yaml
   voice: !include packages/voice.yaml
 
