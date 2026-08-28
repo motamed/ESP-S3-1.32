@@ -1,0 +1,132 @@
+# Voice pipeline: on-device wake word -> Home Assistant Assist -> speaker.
+#
+# The audio path is deliberately split so music and announcements can share one
+# physical speaker:
+#
+#   media source    -> resampler -> \
+#                                    mixer -> ES8311 / speaker
+#   announcements   -> resampler -> /
+#
+# The voice assistant plays its replies through the announcement side, so a TTS
+# reply ducks in over music instead of fighting it for the I2S bus.
+
+speaker:
+  - platform: mixer
+    id: speaker_mixer
+    output_speaker: i2s_speaker
+    num_channels: 1
+    source_speakers:
+      - id: media_mix_input
+        timeout: never
+      - id: announcement_mix_input
+        timeout: never
+
+  - platform: resampler
+    id: media_speaker
+    output_speaker: media_mix_input
+
+  - platform: resampler
+    id: announcement_speaker
+    output_speaker: announcement_mix_input
+
+media_player:
+  - platform: speaker
+    id: satellite_media_player
+    name: Media
+    announcement_pipeline:
+      speaker: announcement_speaker
+      format: FLAC
+      num_channels: 1
+    media_pipeline:
+      speaker: media_speaker
+      format: FLAC
+      num_channels: 1
+    on_announcement:
+      - lvgl.widget.show: voice_overlay
+
+micro_wake_word:
+  id: wake_word
+  microphone:
+    microphone: mic
+  models:
+    - model: okay_nabu
+  on_wake_word_detected:
+    - voice_assistant.start:
+
+voice_assistant:
+  id: assist
+  microphone:
+    microphone: mic
+  media_player: satellite_media_player
+  micro_wake_word: wake_word
+  noise_suppression_level: 2
+  auto_gain: 31dBFS
+  volume_multiplier: 2.0
+
+  on_listening:
+    - lvgl.widget.show: voice_overlay
+    - lvgl.label.update:
+        id: voice_status
+        text: "Listening"
+    - lvgl.label.update:
+        id: voice_transcript
+        text: ""
+
+  on_stt_end:
+    - lvgl.label.update:
+        id: voice_status
+        text: "Thinking"
+    - lvgl.label.update:
+        id: voice_transcript
+        text: !lambda return x;
+
+  on_tts_start:
+    - lvgl.label.update:
+        id: voice_status
+        text: "Replying"
+    - lvgl.label.update:
+        id: voice_transcript
+        text: !lambda return x;
+
+  on_end:
+    - delay: 2s
+    - lvgl.widget.hide: voice_overlay
+
+  on_error:
+    - lvgl.label.update:
+        id: voice_status
+        text: "Sorry"
+    - lvgl.label.update:
+        id: voice_transcript
+        text: !lambda |-
+          return code + ": " + message;
+    - delay: 3s
+    - lvgl.widget.hide: voice_overlay
+
+  # If Home Assistant drops off, stop listening so the device is not stuck with
+  # a half-open pipeline.
+  on_client_disconnected:
+    - voice_assistant.stop:
+    - lvgl.widget.hide: voice_overlay
+
+switch:
+  - platform: template
+    id: wake_word_enabled
+    name: Wake word
+    icon: mdi:microphone
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    on_turn_on:
+      - micro_wake_word.start:
+    on_turn_off:
+      - micro_wake_word.stop:
+      - voice_assistant.stop:
+      - lvgl.widget.hide: voice_overlay
+
+button:
+  # Push-to-talk, for when the wake word is disabled or too noisy to trigger.
+  - platform: template
+    name: Ask
+    icon: mdi:comment-question-outline
+    on_press:
+      - voice_assistant.start:

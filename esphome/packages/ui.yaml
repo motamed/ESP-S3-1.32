@@ -1,0 +1,372 @@
+# Round 466x466 dashboard.
+#
+# Four pages, navigated with the chevron at the bottom of each page, plus a
+# voice overlay that lives on the LVGL top layer so it can appear over whatever
+# page happens to be showing.
+
+time:
+  - platform: homeassistant
+    id: ha_time
+    on_time:
+      # Repaint the clock on the minute rather than polling.
+      - seconds: 0
+        then:
+          - script.execute: refresh_clock
+
+script:
+  - id: refresh_clock
+    then:
+      - lvgl.label.update:
+          id: clock_time
+          text: !lambda |-
+            auto now = id(ha_time).now();
+            if (!now.is_valid()) {
+              return std::string("--:--");
+            }
+            return now.strftime("%H:%M");
+      - lvgl.label.update:
+          id: clock_date
+          text: !lambda |-
+            auto now = id(ha_time).now();
+            if (!now.is_valid()) {
+              return std::string("");
+            }
+            return now.strftime("%A %d %B");
+
+sensor:
+  - platform: homeassistant
+    id: outside_temperature
+    entity_id: ${temperature_entity}
+    on_value:
+      - lvgl.label.update:
+          id: sensor_temp_value
+          text: !lambda return str_sprintf("%.1f°", x);
+
+  - platform: homeassistant
+    id: inside_humidity
+    entity_id: ${humidity_entity}
+    on_value:
+      - lvgl.label.update:
+          id: sensor_humidity_value
+          text: !lambda return str_sprintf("%.0f%%", x);
+      - lvgl.arc.update:
+          id: humidity_arc
+          value: !lambda return x;
+
+text_sensor:
+  - platform: homeassistant
+    id: weather_state
+    entity_id: ${weather_entity}
+    on_value:
+      - lvgl.label.update:
+          id: clock_weather
+          text: !lambda return x;
+
+binary_sensor:
+  - platform: homeassistant
+    id: light_1_state
+    entity_id: ${light_1_entity}
+    trigger_on_initial_state: true
+    on_state:
+      - lvgl.widget.update:
+          id: light_1_button
+          state:
+            checked: !lambda return x;
+
+  - platform: homeassistant
+    id: light_2_state
+    entity_id: ${light_2_entity}
+    trigger_on_initial_state: true
+    on_state:
+      - lvgl.widget.update:
+          id: light_2_button
+          state:
+            checked: !lambda return x;
+
+lvgl:
+  displays:
+    - amoled
+  touchscreens:
+    - touch
+  # A full 466x466 buffer is 434KB. A quarter buffer is plenty and leaves PSRAM
+  # for the audio pipeline.
+  buffer_size: 25%
+  bg_color: 0x000000
+  text_color: 0xFFFFFF
+  border_width: 0
+  pad_all: 0
+
+  style_definitions:
+    - id: nav_chevron
+      bg_opa: TRANSP
+      border_width: 0
+      text_color: 0x5A5A6A
+      text_font: montserrat_20
+
+    - id: tile_button
+      bg_color: 0x14141C
+      bg_opa: COVER
+      border_width: 0
+      radius: 34
+      text_color: 0x8A8A9A
+      text_font: montserrat_20
+
+  top_layer:
+    widgets:
+      - obj:
+          id: voice_overlay
+          hidden: true
+          align: center
+          width: 466
+          height: 466
+          radius: 233
+          bg_color: 0x000000
+          bg_opa: 92%
+          border_width: 0
+          pad_all: 0
+          widgets:
+            - arc:
+                id: voice_ring
+                align: center
+                width: 300
+                height: 300
+                arc_width: 6
+                arc_color: 0x102A26
+                start_angle: 0
+                end_angle: 360
+                adjustable: false
+                indicator:
+                  arc_color: 0x38E0C4
+                  arc_width: 6
+            - label:
+                id: voice_status
+                align: center
+                y: -34
+                text: "Listening"
+                text_font: montserrat_28
+                text_color: 0x38E0C4
+            - label:
+                id: voice_transcript
+                align: center
+                y: 26
+                width: 280
+                text: ""
+                long_mode: wrap
+                text_align: CENTER
+                text_font: montserrat_16
+                text_color: 0xBBBBC8
+
+  pages:
+    # ---------------- Clock ----------------
+    - id: page_clock
+      widgets:
+        - label:
+            id: clock_time
+            align: center
+            y: -34
+            text: "--:--"
+            text_font: montserrat_48
+        - label:
+            id: clock_date
+            align: center
+            y: 24
+            text: ""
+            text_font: montserrat_16
+            text_color: 0x8A8A9A
+        - label:
+            id: clock_weather
+            align: center
+            y: 56
+            text: ""
+            text_font: montserrat_16
+            text_color: 0x38E0C4
+        - button:
+            align: bottom_mid
+            y: -46
+            width: 64
+            height: 40
+            styles: nav_chevron
+            widgets:
+              - label:
+                  align: center
+                  text: "\uF078"
+                  text_font: montserrat_20
+            on_click:
+              - lvgl.page.next:
+
+    # ---------------- Lights ----------------
+    - id: page_lights
+      widgets:
+        - label:
+            align: top_mid
+            y: 74
+            text: "Lights"
+            text_font: montserrat_16
+            text_color: 0x8A8A9A
+        - button:
+            id: light_1_button
+            align: center
+            y: -48
+            width: 268
+            height: 84
+            checkable: true
+            styles: tile_button
+            checked:
+              bg_color: 0x38E0C4
+              text_color: 0x04120F
+            widgets:
+              - label:
+                  align: center
+                  text: ${light_1_name}
+            on_click:
+              - homeassistant.action:
+                  action: light.toggle
+                  data:
+                    entity_id: ${light_1_entity}
+        - button:
+            id: light_2_button
+            align: center
+            y: 48
+            width: 268
+            height: 84
+            checkable: true
+            styles: tile_button
+            checked:
+              bg_color: 0x38E0C4
+              text_color: 0x04120F
+            widgets:
+              - label:
+                  align: center
+                  text: ${light_2_name}
+            on_click:
+              - homeassistant.action:
+                  action: light.toggle
+                  data:
+                    entity_id: ${light_2_entity}
+        - button:
+            align: bottom_mid
+            y: -46
+            width: 64
+            height: 40
+            styles: nav_chevron
+            widgets:
+              - label:
+                  align: center
+                  text: "\uF078"
+                  text_font: montserrat_20
+            on_click:
+              - lvgl.page.next:
+
+    # ---------------- Sensors ----------------
+    - id: page_sensors
+      widgets:
+        - label:
+            align: top_mid
+            y: 74
+            text: "Climate"
+            text_font: montserrat_16
+            text_color: 0x8A8A9A
+        - arc:
+            id: humidity_arc
+            align: center
+            width: 300
+            height: 300
+            arc_width: 12
+            arc_color: 0x1A1A24
+            min_value: 0
+            max_value: 100
+            adjustable: false
+            indicator:
+              arc_color: 0x38E0C4
+              arc_width: 12
+        - label:
+            id: sensor_temp_value
+            align: center
+            y: -26
+            text: "--"
+            text_font: montserrat_48
+        - label:
+            id: sensor_humidity_value
+            align: center
+            y: 26
+            text: "--"
+            text_font: montserrat_20
+            text_color: 0x8A8A9A
+        - button:
+            align: bottom_mid
+            y: -46
+            width: 64
+            height: 40
+            styles: nav_chevron
+            widgets:
+              - label:
+                  align: center
+                  text: "\uF078"
+                  text_font: montserrat_20
+            on_click:
+              - lvgl.page.next:
+
+    # ---------------- Media ----------------
+    - id: page_media
+      widgets:
+        - label:
+            align: top_mid
+            y: 74
+            text: "Media"
+            text_font: montserrat_16
+            text_color: 0x8A8A9A
+        - button:
+            align: center
+            width: 110
+            height: 110
+            radius: 55
+            styles: tile_button
+            widgets:
+              - label:
+                  align: center
+                  text: "\uF04B"
+                  text_font: montserrat_28
+                  text_color: 0xFFFFFF
+            on_click:
+              - media_player.play:
+        - button:
+            align: center
+            x: -128
+            width: 84
+            height: 84
+            radius: 42
+            styles: tile_button
+            widgets:
+              - label:
+                  align: center
+                  text: "\uF048"
+                  text_font: montserrat_20
+            on_click:
+              - media_player.pause:
+        - button:
+            align: center
+            x: 128
+            width: 84
+            height: 84
+            radius: 42
+            styles: tile_button
+            widgets:
+              - label:
+                  align: center
+                  text: "\uF04D"
+                  text_font: montserrat_20
+            on_click:
+              - media_player.stop:
+        - button:
+            align: bottom_mid
+            y: -46
+            width: 64
+            height: 40
+            styles: nav_chevron
+            widgets:
+              - label:
+                  align: center
+                  text: "\uF078"
+                  text_font: montserrat_20
+            on_click:
+              - lvgl.page.next:

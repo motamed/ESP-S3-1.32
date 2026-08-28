@@ -1,0 +1,60 @@
+# Halo -- a Home Assistant voice satellite with a round touch dashboard,
+# for the Waveshare ESP32-S3-Touch-AMOLED-1.32.
+#
+# Build locally:   esphome run esphome/ha-amoled-satellite.yaml
+# Or just flash from the browser -- see the project README.
+
+substitutions:
+  name: halo
+  friendly_name: Halo
+
+  # Point these at your own Home Assistant entities. They are the only things
+  # most people need to change.
+  light_1_entity: light.living_room
+  light_1_name: Living room
+  light_2_entity: light.kitchen
+  light_2_name: Kitchen
+  temperature_entity: sensor.outside_temperature
+  humidity_entity: sensor.living_room_humidity
+  weather_entity: weather.forecast_home
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  # Factory images are flashed to many boards, so give each one a unique
+  # hostname instead of a collision.
+  name_add_mac_suffix: true
+  project:
+    name: motamed.halo
+    version: "dev"
+
+packages:
+  board: !include boards/waveshare-esp32-s3-touch-amoled-1.32.yaml
+  ui: !include packages/ui.yaml
+  voice: !include packages/voice.yaml
+
+api:
+
+ota:
+  - platform: esphome
+
+logger:
+  level: INFO
+  # The board exposes the ESP32-S3 native USB, not a UART bridge. Improv needs
+  # the console on USB_SERIAL_JTAG to talk to the web flasher.
+  hardware_uart: USB_SERIAL_JTAG
+
+wifi:
+  # No credentials here on purpose: the web flasher sends them over USB via
+  # Improv, and the fallback hotspot covers everything else.
+  ap:
+
+captive_portal:
+
+# Lets the browser hand over Wi-Fi credentials immediately after flashing.
+improv_serial:
+
+# Allows adopting this config straight from the Home Assistant ESPHome add-on.
+dashboard_import:
+  package_import_url: github://motamed/ESP-S3-1.32/esphome/ha-amoled-satellite.yaml@main
+  import_full_config: false

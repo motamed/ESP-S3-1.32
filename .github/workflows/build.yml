@@ -1,0 +1,90 @@
+name: Build firmware & publish flasher
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build firmware
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Determine firmware version
+        id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="dev-$(date -u +'%Y%m%d-%H%M')"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Building version $version"
+
+      - name: Stamp version into config
+        run: |
+          sed -i "s/version: \"dev\"/version: \"${{ steps.version.outputs.version }}\"/" \
+            esphome/ha-amoled-satellite.yaml
+
+      # Releases of this action are immutable and no floating major tags exist,
+      # so it is pinned to the v8.0.0 commit.
+      - name: Build firmware
+        id: build
+        uses: esphome/build-action@6b9d3f593d626a2f0d2c17daebf0a97957d67425 # v8.0.0
+        with:
+          yaml-file: esphome/ha-amoled-satellite.yaml
+          version: latest
+          complete-manifest: true
+          release-summary: "Halo ${{ steps.version.outputs.version }}"
+          release-url: "https://github.com/${{ github.repository }}/releases"
+
+      - name: Assemble the Pages site
+        run: |
+          mkdir -p site/firmware
+          cp -r docs/. site/
+          # The .elf is only useful for local crash decoding, so keep it out of
+          # the published site.
+          find "${{ steps.build.outputs.name }}" -maxdepth 1 -type f \
+            ! -name '*.elf' -exec cp {} site/firmware/ \;
+          echo "Published firmware files:"
+          ls -lh site/firmware
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+      - name: Upload firmware for release attachment
+        uses: actions/upload-artifact@v7
+        with:
+          name: firmware
+          path: ${{ steps.build.outputs.name }}
+          if-no-files-found: error
+
+  deploy:
+    name: Deploy flasher to GitHub Pages
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v5

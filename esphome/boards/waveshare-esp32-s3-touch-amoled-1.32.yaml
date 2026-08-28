@@ -1,0 +1,204 @@
+# Hardware definition for the Waveshare ESP32-S3-Touch-AMOLED-1.32.
+#
+# Every GPIO here is taken from Waveshare's own sources, cross-checked between
+# two independent repositories that agree with each other:
+#
+#   waveshareteam/Waveshare-ESP32-components
+#     bsp/esp32_s3_touch_amoled_1_32/include/bsp/esp32_s3_touch_amoled_1_32.h
+#   waveshareteam/ESP32-S3-Touch-AMOLED-1.32
+#     Example/ESP-IDF/08_FactoryProgram/main/user_config.h
+#
+# Note: board_cfg.txt in the vendor demo lists "i2c: {sda: 8, scl: 7}" for the
+# codec. That is wrong -- GPIO7/8 are the touch and LCD reset lines. Every
+# user_config.h in the repo uses GPIO47/48, which is what we use here.
+
+substitutions:
+  # Display (CO5300, QSPI)
+  pin_lcd_cs: GPIO10
+  pin_lcd_clk: GPIO11
+  pin_lcd_d0: GPIO12
+  pin_lcd_d1: GPIO13
+  pin_lcd_d2: GPIO14
+  pin_lcd_d3: GPIO15
+  pin_lcd_reset: GPIO8
+  # GPIO9 is the tearing-effect line. Unused by ESPHome, but keep it free.
+
+  # Shared I2C bus: CST820 touch (0x15) + ES8311 codec (0x18)
+  pin_i2c_sda: GPIO47
+  pin_i2c_scl: GPIO48
+  pin_touch_int: GPIO6
+  pin_touch_reset: GPIO7
+
+  # Audio (ES8311)
+  pin_i2s_mclk: GPIO38
+  pin_i2s_bclk: GPIO39
+  pin_i2s_lrclk: GPIO41
+  pin_i2s_din: GPIO40
+  pin_i2s_dout: GPIO42
+  pin_amp_enable: GPIO46
+
+  # Buttons, power, battery
+  pin_button_boot: GPIO0
+  pin_button_power: GPIO17
+  pin_power_hold: GPIO18
+  pin_battery_adc: GPIO3
+
+esp32:
+  board: esp32-s3-devkitc-1
+  flash_size: 8MB
+  framework:
+    type: esp-idf
+
+# The vendor ships this board with octal (OPI) PSRAM. Configuring it as quad
+# will not boot.
+psram:
+  mode: octal
+  speed: 80MHz
+
+i2c:
+  - id: bus_i2c
+    sda: ${pin_i2c_sda}
+    scl: ${pin_i2c_scl}
+    frequency: 400kHz
+
+spi:
+  - id: bus_qspi
+    type: quad
+    clk_pin: ${pin_lcd_clk}
+    data_pins:
+      - ${pin_lcd_d0}
+      - ${pin_lcd_d1}
+      - ${pin_lcd_d2}
+      - ${pin_lcd_d3}
+
+display:
+  - platform: mipi_spi
+    id: amoled
+    spi_id: bus_qspi
+    model: CO5300
+    bus_mode: quad
+    cs_pin: ${pin_lcd_cs}
+    reset_pin: ${pin_lcd_reset}
+    data_rate: 40MHz
+    # The CO5300 has 480 columns of RAM but the panel only shows 466, starting
+    # at column 6. Without this offset the whole image sits shifted.
+    dimensions:
+      width: 466
+      height: 466
+      offset_width: 6
+      offset_height: 0
+    # AMOLED: there is no backlight GPIO, brightness is a controller register.
+    brightness: 0xD0
+    auto_clear_enabled: false
+    update_interval: never
+
+touchscreen:
+  - platform: cst816
+    id: touch
+    i2c_id: bus_i2c
+    display: amoled
+    interrupt_pin: ${pin_touch_int}
+    reset_pin: ${pin_touch_reset}
+
+switch:
+  # GPIO18 latches the regulator on. When running from the battery the board
+  # powers itself back off shortly after the PWR button is released unless this
+  # is driven high, so it must come up with the firmware and stay up.
+  - platform: gpio
+    id: power_hold
+    pin: ${pin_power_hold}
+    restore_mode: ALWAYS_ON
+    internal: true
+
+  # Speaker amplifier enable, active high.
+  - platform: gpio
+    id: amplifier_enable
+    pin:
+      number: ${pin_amp_enable}
+      # Strapping pin, but this is how the board is wired.
+      ignore_strapping_warning: true
+    restore_mode: ALWAYS_ON
+    internal: true
+
+i2s_audio:
+  - id: bus_i2s
+    i2s_mclk_pin: ${pin_i2s_mclk}
+    i2s_bclk_pin: ${pin_i2s_bclk}
+    i2s_lrclk_pin: ${pin_i2s_lrclk}
+
+audio_dac:
+  - platform: es8311
+    id: codec
+    i2c_id: bus_i2c
+    address: 0x18
+    sample_rate: 16000
+    bits_per_sample: 16bit
+    use_mclk: true
+    # The onboard microphone is analog, not PDM.
+    use_microphone: false
+
+microphone:
+  - platform: i2s_audio
+    id: mic
+    i2s_audio_id: bus_i2s
+    i2s_din_pin: ${pin_i2s_din}
+    adc_type: external
+    sample_rate: 16000
+    bits_per_sample: 16bit
+    channel: left
+
+speaker:
+  - platform: i2s_audio
+    id: i2s_speaker
+    i2s_audio_id: bus_i2s
+    i2s_dout_pin: ${pin_i2s_dout}
+    dac_type: external
+    audio_dac: codec
+    sample_rate: 16000
+    bits_per_sample: 16bit
+    channel: mono
+    buffer_duration: 100ms
+
+binary_sensor:
+  - platform: gpio
+    id: button_boot
+    name: BOOT button
+    pin:
+      number: ${pin_button_boot}
+      # GPIO0 is the strapping pin that selects download mode; using it as a
+      # button after boot is exactly what the vendor does.
+      ignore_strapping_warning: true
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+
+  - platform: gpio
+    id: button_power
+    name: Power button
+    pin:
+      number: ${pin_button_power}
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+
+sensor:
+  # The board divides the battery voltage by two before the ADC.
+  - platform: adc
+    id: battery_voltage
+    pin:
+      number: ${pin_battery_adc}
+      ignore_strapping_warning: true
+    name: Battery voltage
+    unit_of_measurement: V
+    device_class: voltage
+    state_class: measurement
+    accuracy_decimals: 2
+    attenuation: 12db
+    update_interval: 60s
+    filters:
+      - multiply: 2.0
+      - sliding_window_moving_average:
+          window_size: 5
+          send_every: 5
