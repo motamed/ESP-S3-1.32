@@ -53,20 +53,30 @@ blueprint:
       collapsed: false
       input:
         tile_1_light:
-          name: Tile 1 light
-          description: Toggled by the top tile.
+          name: Tile 1 entity
+          description: >-
+            Toggled by the top tile. A light, switch, fan, or input boolean.
           selector:
             entity:
               filter:
-                domain: light
+                domain:
+                  - light
+                  - switch
+                  - fan
+                  - input_boolean
 
         tile_2_light:
-          name: Tile 2 light
-          description: Toggled by the bottom tile.
+          name: Tile 2 entity
+          description: >-
+            Toggled by the bottom tile. A light, switch, fan, or input boolean.
           selector:
             entity:
               filter:
-                domain: light
+                domain:
+                  - light
+                  - switch
+                  - fan
+                  - input_boolean
 
         temperature_sensor:
           name: Temperature sensor
@@ -163,8 +173,10 @@ conditions: []
 actions:
   - choose:
       # ---- device -> Home Assistant ----
-      # Only act when the tile and the light actually disagree. That is what
+      # Only act when the tile and the target actually disagree. That is what
       # stops this ping-ponging with the sync branch below.
+      # homeassistant.turn_on/off dispatches by domain, so one call covers a
+      # light, switch, fan or input boolean.
       - alias: Tile 1 tapped
         conditions:
           - condition: trigger
@@ -173,7 +185,7 @@ actions:
             value_template: >-
               {{ is_state(tile_1_switch, 'on') != is_state(tile_1_light, 'on') }}
         sequence:
-          - action: "light.turn_{{ 'on' if is_state(tile_1_switch, 'on') else 'off' }}"
+          - action: "homeassistant.turn_{{ 'on' if is_state(tile_1_switch, 'on') else 'off' }}"
             target:
               entity_id: "{{ tile_1_light }}"
 
@@ -185,7 +197,7 @@ actions:
             value_template: >-
               {{ is_state(tile_2_switch, 'on') != is_state(tile_2_light, 'on') }}
         sequence:
-          - action: "light.turn_{{ 'on' if is_state(tile_2_switch, 'on') else 'off' }}"
+          - action: "homeassistant.turn_{{ 'on' if is_state(tile_2_switch, 'on') else 'off' }}"
             target:
               entity_id: "{{ tile_2_light }}"
 
