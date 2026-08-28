@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Halo &mdash; Home Assistant Voice Satellite</title>
+    <meta
+      name="description"
+      content="Flash your Waveshare ESP32-S3-Touch-AMOLED-1.32 into a Home Assistant voice satellite with a round touch dashboard. No software to install."
+    />
+    <link rel="stylesheet" href="style.css" />
+    <script
+      type="module"
+      src="https://unpkg.com/esp-web-tools@10.4.0/dist/web/install-button.js?module"
+    ></script>
+  </head>
+  <body>
+    <header class="hero">
+      <div class="device" aria-hidden="true">
+        <div class="bezel">
+          <div class="screen">
+            <div class="ring"></div>
+            <div class="time">9:41</div>
+            <div class="sub">Listening&hellip;</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pitch">
+        <p class="eyebrow">Waveshare ESP32-S3-Touch-AMOLED-1.32</p>
+        <h1>Halo</h1>
+        <p class="tagline">
+          A Home Assistant voice satellite with a 466&times;466 round touch
+          dashboard. On-device wake word, local speech, and a screen that
+          actually earns its place on your shelf.
+        </p>
+
+        <esp-web-install-button manifest="firmware/manifest.json">
+          <button class="cta" slot="activate">Connect &amp; install</button>
+          <span class="notice" slot="unsupported">
+            Your browser can&rsquo;t talk to serial devices. Use Chrome, Edge,
+            or Opera on desktop.
+          </span>
+          <span class="notice" slot="not-allowed">
+            Web Serial needs a secure context &mdash; open this page over
+            HTTPS.
+          </span>
+        </esp-web-install-button>
+
+        <p class="fineprint">
+          Flashes over USB straight from this page. Nothing to install.
+        </p>
+      </div>
+    </header>
+
+    <main>
+      <section class="steps">
+        <h2>How it works</h2>
+        <ol>
+          <li>
+            <h3>Plug it in</h3>
+            <p>
+              Connect the board to your computer with a USB-C
+              <strong>data</strong> cable. Charge-only cables are the single
+              most common reason the device never shows up.
+            </p>
+          </li>
+          <li>
+            <h3>Install</h3>
+            <p>
+              Hit <em>Connect &amp; install</em> and pick the serial port. If no
+              port appears, hold <strong>BOOT</strong>, tap
+              <strong>RESET</strong>, then release BOOT to force the bootloader.
+            </p>
+          </li>
+          <li>
+            <h3>Join Wi-Fi</h3>
+            <p>
+              When the flash finishes, the page offers to send Wi-Fi credentials
+              over the same cable via Improv. No hotspot juggling.
+            </p>
+          </li>
+          <li>
+            <h3>Adopt in Home Assistant</h3>
+            <p>
+              Home Assistant discovers it automatically. Click adopt, assign an
+              Assist pipeline, and start talking.
+            </p>
+          </li>
+        </ol>
+      </section>
+
+      <section class="features">
+        <h2>What you get</h2>
+        <div class="grid">
+          <article>
+            <h3>On-device wake word</h3>
+            <p>
+              microWakeWord runs on the ESP32-S3 itself. Audio only leaves the
+              device after you address it.
+            </p>
+          </article>
+          <article>
+            <h3>Round dashboard</h3>
+            <p>
+              Swipe between clock, lights, sensors, and media. Arc dimmers and
+              dial thermostats built for a circular panel.
+            </p>
+          </article>
+          <article>
+            <h3>Real audio</h3>
+            <p>
+              ES8311 codec with onboard mic and a speaker header &mdash; TTS
+              replies, timers, chimes, and announcements.
+            </p>
+          </article>
+          <article>
+            <h3>True-black idle</h3>
+            <p>
+              AMOLED means unlit pixels draw nothing. The idle face is designed
+              around that instead of fighting it.
+            </p>
+          </article>
+          <article>
+            <h3>OTA forever</h3>
+            <p>
+              You only need the cable once. Every later update ships over your
+              network from Home Assistant.
+            </p>
+          </article>
+          <article>
+            <h3>Yours to change</h3>
+            <p>
+              Plain ESPHome YAML. Fork it, edit a page, and rebuild &mdash; no
+              C++ required.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section class="troubleshooting">
+        <h2>If something goes wrong</h2>
+        <dl>
+          <dt>No serial port in the picker</dt>
+          <dd>
+            Use a data-capable USB-C cable, then force the bootloader: hold
+            BOOT, tap RESET, release BOOT. On Windows you may need the
+            CH34x/CP210x driver.
+          </dd>
+
+          <dt>The install button never appears</dt>
+          <dd>
+            Web Serial is desktop-only and unsupported in Firefox and Safari.
+            Chrome, Edge, or Opera will work.
+          </dd>
+
+          <dt>Screen stays black after flashing</dt>
+          <dd>
+            Give it about 30 seconds on first boot. If it stays dark, check the
+            USB serial log &mdash; a mismatched flash or PSRAM mode shows up
+            there as a boot loop.
+          </dd>
+
+          <dt>It flashed, but Home Assistant can&rsquo;t see it</dt>
+          <dd>
+            Confirm it joined the right 2.4&nbsp;GHz network &mdash; the ESP32-S3
+            has no 5&nbsp;GHz radio. Then check
+            <em>Settings &rarr; Devices &amp; Services</em> for a discovered
+            ESPHome device.
+          </dd>
+        </dl>
+      </section>
+    </main>
+
+    <footer>
+      <p>
+        Built with <a href="https://esphome.io">ESPHome</a> and
+        <a href="https://esphome.github.io/esp-web-tools/">ESP Web Tools</a>.
+      </p>
+      <p class="repo-link">
+        <a href="https://github.com/motamed/ESP-S3-1.32">Source on GitHub</a>
+      </p>
+    </footer>
+  </body>
+</html>

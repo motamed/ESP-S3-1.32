@@ -1,0 +1,17 @@
+# ESPHome
+.esphome/
+esphome/secrets.yaml
+*.bin
+*.elf
+
+# Local validation environment
+.venv-esphome/
+
+# Build output copied into the Pages site by CI
+docs/firmware/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
