@@ -18,7 +18,7 @@ software to install, works in Chrome, Edge, and Opera.
 - **Set up without touching YAML.** Pick your lights and sensors from
   dropdowns in Home Assistant. Entity IDs are not compiled into the firmware,
   so you can change them later without reflashing.
-- **Round dashboard.** Clock, two light toggles, a climate arc, and media
+- **Round dashboard.** Clock, two toggle tiles, a climate arc, and media
   transport controls, laid out for a circular panel rather than cropped from a
   rectangular one. Swipe or tap the chevron to move between pages.
 - **Real audio.** ES8311 codec drives the onboard mic and the speaker header,
@@ -54,8 +54,8 @@ whatever you pick:
 1. Import [`blueprints/halo_dashboard.yaml`](blueprints/halo_dashboard.yaml)
    under *Settings → Automations & Scenes → Blueprints → Import blueprint*.
 2. Create an automation from it.
-3. Pick your satellite, its two `Tile` switches, and the lights, sensors, and
-   weather entity you want shown.
+3. Pick your satellite, its two `Tile` switches, and the entities you want
+   shown. Tiles accept a light, switch, fan, or input boolean.
 
 That's it — the screen fills in within a few seconds. Change your mind later
 and just edit the automation; no rebuild, no reflash.
@@ -68,7 +68,7 @@ Until you do this, the climate page shows `--` and the tiles read
 | Direction | Mechanism |
 | --- | --- |
 | HA → screen | Blueprint calls `number.set_value` / `text.set_value` on the device's slots |
-| Screen → HA | Tapping a tile flips the device's `Tile` switch; the blueprint sees it and toggles the real light |
+| Screen → HA | Tapping a tile flips the device's `Tile` switch; the blueprint sees it and toggles the real entity with `homeassistant.turn_on`/`off`, which dispatches by domain |
 
 The blueprint finds the write-only slots itself via `device_entities()`, so it
 keeps working regardless of the MAC suffix in the device name. Only the two
